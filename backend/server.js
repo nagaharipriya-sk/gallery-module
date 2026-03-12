@@ -7,18 +7,26 @@ const path = require("path");
 require("dotenv").config();
 
 const app = express();
+
 app.use(cors());
 app.use(express.json());
 
-// MongoDB Connect
-mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("MongoDB Connected"))
-  .catch(err => console.log(err));
+/* ---------------- MongoDB Connection ---------------- */
 
-// Serve uploads folder
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => console.log("MongoDB Connected"))
+.catch((err) => console.log(err));
+
+
+/* ---------------- Uploads Folder ---------------- */
+
 app.use("/uploads", express.static("uploads"));
 
-// Storage Config
+/* ---------------- Multer Config ---------------- */
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, "uploads/");
@@ -30,39 +38,141 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// Schema
+
+/* ---------------- Gallery Schema ---------------- */
+
 const gallerySchema = new mongoose.Schema({
-  imageUrl: String,
+  imageUrl: String
 });
 
 const Gallery = mongoose.model("Gallery", gallerySchema);
 
+
+/* ---------------- Events Schema ---------------- */
+
+const eventSchema = new mongoose.Schema({
+  title: String,
+  description: String,
+  date: String,
+  createdAt: {
+    type: Date,
+    default: Date.now
+  }
+});
+
+const Event = mongoose.model("Event", eventSchema);
+
+
+/* ---------------- Gallery APIs ---------------- */
+
 // GET Gallery
 app.get("/gallery", async (req, res) => {
-  const images = await Gallery.find();
-  res.json(images);
+  try {
+    const images = await Gallery.find();
+    res.json(images);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch images" });
+  }
 });
 
-// POST Upload
+// Upload Image
 app.post("/gallery", upload.single("image"), async (req, res) => {
-  const newImage = new Gallery({
-    imageUrl: `uploads/${req.file.filename}`,
-  });
-  await newImage.save();
-  res.json({ message: "Image Uploaded" });
+  try {
+
+    const newImage = new Gallery({
+      imageUrl: `uploads/${req.file.filename}`
+    });
+
+    await newImage.save();
+
+    res.json({ message: "Image Uploaded Successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: "Upload Failed" });
+  }
 });
 
-// DELETE Image
+// Delete Image
 app.delete("/gallery/:id", async (req, res) => {
   try {
+
     await Gallery.findByIdAndDelete(req.params.id);
-    res.json({ message: "Image Deleted" });
-  } catch (err) {
+
+    res.json({ message: "Image Deleted Successfully" });
+
+  } catch (error) {
     res.status(500).json({ error: "Delete Failed" });
   }
 });
 
-// Start Server
-app.listen(process.env.PORT, () => {
-  console.log(`Server running on ${process.env.PORT}`);
+
+/* ---------------- Events APIs ---------------- */
+
+// GET Events
+app.get("/events", async (req, res) => {
+  try {
+
+    const events = await Event.find().sort({ createdAt: -1 });
+
+    res.json(events);
+
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch events" });
+  }
+});
+
+// ADD Event
+app.post("/events", async (req, res) => {
+  try {
+
+    const { title, description, date } = req.body;
+
+    const newEvent = new Event({
+      title,
+      description,
+      date
+    });
+
+    await newEvent.save();
+
+    res.json({ message: "Event Added Successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: "Failed to add event" });
+  }
+});
+
+// UPDATE Event
+app.put("/events/:id", async (req, res) => {
+  try {
+
+    await Event.findByIdAndUpdate(req.params.id, req.body);
+
+    res.json({ message: "Event Updated Successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: "Update Failed" });
+  }
+});
+
+// DELETE Event
+app.delete("/events/:id", async (req, res) => {
+  try {
+
+    await Event.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Event Deleted Successfully" });
+
+  } catch (error) {
+    res.status(500).json({ error: "Delete Failed" });
+  }
+});
+
+
+/* ---------------- Server ---------------- */
+
+const PORT = process.env.PORT || 5000;
+
+app.listen(PORT, () => {
+  console.log(`Server running on ${PORT}`);
 });
